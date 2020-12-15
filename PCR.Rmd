@@ -1,0 +1,76 @@
+---
+title: 'Margo Killey'
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(ISLR)
+data("College")
+library(dplyr)
+library(leaps)
+library(boot)
+library(glmnet)
+library(pls)
+```
+
+
+```{r}
+College <- College %>% mutate(Accept_Apps = Accept / Apps)
+College <- College[-c(2, 3)]
+```
+
+Now splitting data into testing and training dataseats. 
+```{r}
+set.seed(234)
+train_size <- floor(nrow(College) * 0.7)
+train_id <- sample(1:nrow(College), train_size)
+trainCollege <- College[train_id, ]
+testCollege <- College[-train_id, ]
+```
+
+2.a)
+```{r}
+summary(College)
+```
+I am going to standardize the variables because their ranges are so different. 
+
+```{r}
+College <- na.omit(College)
+X <- model.matrix(Accept_Apps ~ ., College)
+colPCA <- prcomp(x = X, center = T, scale = T)
+summary(colPCA)
+names(colPCA)
+plot(colPCA)
+
+loadings <- colPCA$rotation
+loadings
+```
+To explain at least 95% of the variance in the data, you'd need the first 3 eigenvalues. 
+My loadings variable has columns are the PC vectors wi, and the elements of these vectors are my loadings, wij. 
+
+The loadings of the first 2 PCs are: 
+```{r}
+print(loadings[1:2, ])
+```
+
+2.b)
+```{r}
+set.seed(1)
+colPCR <- pcr(Accept_Apps ~ ., data = trainCollege, scale = TRUE, validation = "CV")
+names(colPCR)
+validationplot(colPCR, val.type = "MSEP", legendpos = "topright")
+summary(colPCR)
+
+```
+My minimum CV is when I have M = 16, with CV ROOT MSE = 0.1196. So, going to find my testing error with ncomp = 16. 
+```{r}
+
+colPCR.pred <- predict(colPCR, testCollege[, -17], ncomp = 16)
+PCRTestMSE <- mean((colPCR.pred - testCollege[, 17])^2)
+PCRTestMSE
+```
+
+My test MSE is 0.01621.
+So, with my results, I get another super low testing error of 0.01621. However, if I compare this to the methods from HW 6, I would still recommend the adjusted R - squared method because that still has the lowest testing error of all of the methods at 0.0155. 
